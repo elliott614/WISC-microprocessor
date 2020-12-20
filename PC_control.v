@@ -1,0 +1,33 @@
+module PC_control(input [2:0] C, input [8:0] I, input [15:0] aluin1, input [3:0] Opcode, input [2:0] F, input [15:0] PC_in, output [15:0] PC_out, input halt);
+
+  wire   Cout1, Cout2, Z, V, N, BR, B;
+  reg    BranchEn;
+  wire   [15:0] PCplus2, AddShiftRes;
+
+  assign {Z, V, N} =  F;
+  assign  PC_out   = halt ? PC_in
+		   : (BranchEn & BR) ? aluin1 
+		   : (BranchEn & B) ? AddShiftRes 
+		   : PCplus2;
+
+  assign  B        = (Opcode == 4'b1100);
+  assign  BR       = (Opcode == 4'b1101);
+
+  add_16bit_lookahead plus2       ( .Sum(PCplus2),       .C16(Cout1),  .A(PC_in),   .B(16'h0002),             .C0(1'b0) ),
+                      branchAdder ( .Sum(AddShiftRes),   .C16(Cout2),  .A(PCplus2), .B({{6{I[8]}}, I, 1'b0}), .C0(1'b0) );
+
+  always @ (C, F)
+  begin
+    case (C)
+      3'b000  : BranchEn =   ~Z;       //NEQ
+      3'b001  : BranchEn =    Z;       //EQ
+      3'b010  : BranchEn =  ~(Z  | N); //GT
+      3'b011  : BranchEn =    N;       //LT
+      3'b100  : BranchEn =   ~N;       //GTEQ
+      3'b101  : BranchEn =    Z  | N;  //LTEQ
+      3'b110  : BranchEn =    V;       //Ovfl
+      default : BranchEn = 1'b1;       //Always
+    endcase
+  end
+
+endmodule
