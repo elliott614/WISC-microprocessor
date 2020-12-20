@@ -1,4 +1,4 @@
-module intruction_memory (clk, rst_n, pcCurrent, instruction);
+module instruction_memory (clk, rst_n, pcCurrent, instruction);
 
   input         clk, rst_n;
   input  [15:0] pcCurrent;

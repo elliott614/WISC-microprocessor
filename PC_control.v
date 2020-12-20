@@ -1,20 +1,44 @@
-module PC_control(input [2:0] C, input [8:0] I, input [15:0] aluin1, input [3:0] Opcode, input [2:0] F, input [15:0] PC_in, output [15:0] PC_out, input halt);
+module PC_control(input  [15:0] ID_instr,  ID_pc, br_addr, input [2:0] F, input [15:0] IF_pc_in,
+                  output [15:0] IF_pc_out, input halt, output inval_out, input inval_in);
+
+//IF_pc_in  = current value of PC in fetch stage
+//IF_pc_out = next value of PC, input to IF/ID block
+//ID_pc     = PC in ID stage (output from IF/ID block)
+//ID_instr  = Instruction currently in ID stage
+//br_addr   = address from register in BR instruction
+//F         = flags
+//halt      = halt? obviously
+
+//in case of branch, should be able to just stall pipeline until F and (if BR) br_addr inputs are valid
 
   wire   Cout1, Cout2, Z, V, N, BR, B;
+  wire   [15:0] PCplus2, AddShiftRes, ID_pc_plus2;
   reg    BranchEn;
-  wire   [15:0] PCplus2, AddShiftRes;
+  wire   [2:0] C;
+  wire   [8:0] I;
+  wire   [3:0] Opcode;
+
+  assign C      = ID_instr[11:9];
+  assign I      = ID_instr[8:0];
+  assign Opcode = ID_instr[15:12];
 
   assign {Z, V, N} =  F;
-  assign  PC_out   = halt ? PC_in
-		   : (BranchEn & BR) ? aluin1 
-		   : (BranchEn & B) ? AddShiftRes 
-		   : PCplus2;
+
+ assign  IF_pc_out = halt ? IF_pc_in
+		   : inval_in ? PCplus2
+		   : (BranchEn & BR) ? br_addr 	
+		   : (BranchEn & B)  ? AddShiftRes
+		   :  PCplus2;
 
   assign  B        = (Opcode == 4'b1100);
   assign  BR       = (Opcode == 4'b1101);
 
-  add_16bit_lookahead plus2       ( .Sum(PCplus2),       .C16(Cout1),  .A(PC_in),   .B(16'h0002),             .C0(1'b0) ),
-                      branchAdder ( .Sum(AddShiftRes),   .C16(Cout2),  .A(PCplus2), .B({{6{I[8]}}, I, 1'b0}), .C0(1'b0) );
+//we will never have 2 invalids in a row
+  assign inval_out = inval_in ? 1'b0 : (BranchEn & (B | BR));
+
+  add_16bit_lookahead plus2       ( .Sum(PCplus2),   .C16(Cout1), .A(IF_pc_in), .B(16'h0002),             .C0(1'b0) ),
+ 		      add2 ( .Sum(ID_pc_plus2),   .C16(Cout1), .A(ID_pc), .B(16'h0002),             .C0(1'b0) ),
+                      branchAdder ( .Sum(AddShiftRes), .C16(Cout2), .A(ID_pc_plus2),    .B({{6{I[8]}}, I, 1'b0}), .C0(1'b0) );
 
   always @ (C, F)
   begin

@@ -5,7 +5,7 @@ module BitCell( input clk, input rst, input D, input WriteEnable, input ReadEnab
 
   dff dff (.q(q), .d(D), .wen(WriteEnable), .clk(clk), .rst(rst));
 
-  assign Bitline1 = ReadEnable1 ? q : 'bz;
-  assign Bitline2 = ReadEnable2 ? q : 'bz;
+  assign Bitline1 = ReadEnable1 ? (WriteEnable ? D : q) : 'bz;
+  assign Bitline2 = ReadEnable2 ? (WriteEnable ? D : q) : 'bz;
 
 endmodule

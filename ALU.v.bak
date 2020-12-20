@@ -1,10 +1,9 @@
-module ALU  ( alu_out, Z, V, N, alu_in1, alu_in2, Opcode, clk, rst, inval );
+module ALU  ( alu_out, Z, V, N, alu_in1, alu_in2, Opcode, clk, rst );
   output reg [15:0]  alu_out;
   output             Z,     V,    N;                //flag register outputs
   input      [15:0]  alu_in1,     alu_in2;
   input      [3:0]   Opcode;
   input              clk,   rst;
-  input 	     inval;
 
   wire       [3:0]   Imm;
   assign             Imm =  alu_in2[3:0];
@@ -60,8 +59,8 @@ module ALU  ( alu_out, Z, V, N, alu_in1, alu_in2, Opcode, clk, rst, inval );
 
 
 
-  dff     Nff          (.q(N),  .d(inval ? N : NN),  .wen(NVen), .clk(clk), .rst(rst)),
-          Zff          (.q(Z),  .d(inval ? Z : ZZ),  .wen(Zen),  .clk(clk), .rst(rst)),
-          Vff          (.q(V),  .d(inval ? V : VV),  .wen(NVen), .clk(clk), .rst(rst));
+  dff     Nff          (.q(N),  .d(NN),  .wen(NVen), .clk(clk), .rst(rst)),
+          Zff          (.q(Z),  .d(ZZ),  .wen(Zen),  .clk(clk), .rst(rst)),
+          Vff          (.q(V),  .d(VV),  .wen(NVen), .clk(clk), .rst(rst));
 
 endmodule

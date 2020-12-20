@@ -1,4 +1,4 @@
-module cpu_tb();
+module cpu_ptb();
   
 
    wire [15:0] PC;
@@ -11,7 +11,8 @@ module cpu_tb();
    wire        MemWrite;       /* Similar as above but for memory */
    wire        MemRead;
    wire [15:0] MemAddress;
-   wire [15:0] MemData, MemDataRead;
+   wire [15:0] MemDataIn;	/* Read from Memory */
+   wire [15:0] MemDataOut;	/* Written to Memory */
 
    wire        Halt;         /* Halt executed and in Memory or writeback stage */
         
@@ -26,21 +27,18 @@ module cpu_tb();
 
      
 
-   cpu DUT(.clk(clk), .rst_n(rst_n), .pc(PC), .hlt(Halt)); /* Instantiate your processor */
+   cpu DUT(.clk(clk), .rst_n(rst_n), .pc_out(PC), .hlt(Halt)); /* Instantiate your processor */
    
-
-
-
 
 
 
    /* Setup */
    initial begin
       $display("Hello world...simulation starting");
-      $display("See verilogsim.log and verilogsim.trace for output");
+      $display("See verilogsim.plog and verilogsim.ptrace for output");
       inst_count = 0;
-      trace_file = $fopen("verilogsim.trace");
-      sim_log_file = $fopen("verilogsim.log");
+      trace_file = $fopen("verilogsim.ptrace");
+      sim_log_file = $fopen("verilogsim.plog");
       
    end
 
@@ -68,8 +66,7 @@ module cpu_tb();
     	cycle_count = cycle_count + 1;
 	if (cycle_count > 100000) begin
 		$display("hmm....more than 100000 cycles of simulation...error?\n");
-	
-	$finish;
+		$finish;
 	end
     end
 
@@ -86,7 +83,7 @@ module cpu_tb();
          if (Halt || RegWrite || MemWrite) begin
             inst_count = inst_count + 1;
          end
-         $fdisplay(sim_log_file, "SIMLOG:: Cycle %d PC: %8x I: %8x R: %d %3d %8x M: %d %d %8x %8x",
+         $fdisplay(sim_log_file, "SIMLOG:: Cycle %d PC: %8x I: %8x R: %d %3d %8x M: %d %d %8x %8x %8x",
                   cycle_count,
                   PC,
                   Inst,
@@ -96,57 +93,35 @@ module cpu_tb();
                   MemRead,
                   MemWrite,
                   MemAddress,
-                  MemData);
+                  MemDataIn,
+		  MemDataOut);
          if (RegWrite) begin
-            if (MemRead) begin
-               // ld
-               $fdisplay(trace_file,"INUM: %8d PC: 0x%04x REG: %d VALUE: 0x%04x ADDR: 0x%04x",
-                         (inst_count-1),
-                        PC,
-                        WriteRegister,
-                        WriteData,
-                        MemAddress);
-            end else begin
-               $fdisplay(trace_file,"INUM: %8d PC: 0x%04x REG: %d VALUE: 0x%04x",
-                         (inst_count-1),
-                        PC,
-                        WriteRegister,
-                        WriteData );
-            end
-         end else if (Halt) begin
+            $fdisplay(trace_file,"REG: %d VALUE: 0x%04x",
+                      WriteRegister,
+                      WriteData );            
+         end
+         if (MemRead) begin
+            $fdisplay(trace_file,"LOAD: ADDR: 0x%04x VALUE: 0x%04x",
+                      MemAddress, MemDataOut );
+         end
+
+         if (MemWrite) begin
+            $fdisplay(trace_file,"STORE: ADDR: 0x%04x VALUE: 0x%04x",
+                      MemAddress, MemDataIn  );
+         end
+         if (Halt) begin
             $fdisplay(sim_log_file, "SIMLOG:: Processor halted\n");
             $fdisplay(sim_log_file, "SIMLOG:: sim_cycles %d\n", cycle_count);
             $fdisplay(sim_log_file, "SIMLOG:: inst_count %d\n", inst_count);
-            $fdisplay(trace_file, "INUM: %8d PC: 0x%04x",
-                      (inst_count-1),
-                      PC );
 
             $fclose(trace_file);
             $fclose(sim_log_file);
-           
+	    #5;
             $finish;
-         end else begin
-            if (MemWrite) begin
-               // st
-               $fdisplay(trace_file,"INUM: %8d PC: 0x%04x ADDR: 0x%04x VALUE: 0x%04x",
-                         (inst_count-1),
-                        PC,
-                        MemAddress,
-                        MemData);
-            end else begin
-               // conditional branch or NOP
-               // Need better checking in pipelined testbench
-               inst_count = inst_count + 1;
-               $fdisplay(trace_file, "INUM: %8d PC: 0x%04x",
-                         (inst_count-1),
-                         PC );
-            end
          end 
       end
       
    end
-
-
    /* Assign internal signals to top level wires
       The internal module names and signal names will vary depending
       on your naming convention and your design */
@@ -155,38 +130,41 @@ module cpu_tb();
    // names on the right hand side
     
 //   assign PC = DUT.fetch0.pcCurrent; //You won't need this because it's part of the main cpu interface
-   assign Inst = DUT.fetch0.instruction;
    
-   assign RegWrite = DUT.regwrite;
-   // Is memory being read, one bit signal (1 means yes, 0 means no)
-   
-   assign WriteRegister = DUT.writereg;
-   // The name of the register being written to. (4 bit signal)
-
-   assign WriteData = DUT.output_value;
-   // Data being written to the register. (16 bits)
-   
-   assign MemRead =  DUT.memread;
-   // Is memory being read, one bit signal (1 means yes, 0 means no)
-   
-   assign MemWrite = (DUT.memwrite);
-   // Is memory being written to (1 bit signal)
-   
-   assign MemAddress = DUT.alu_out;
-   // Address to access memory with (for both reads and writes to memory, 16 bits)
-   
-   assign MemData = DUT.register2;
-   // Data to be written to memory for memory writes (16 bits)
-  
-   assign MemData = DUT.register2;
-
-   assign MemDataRead = DUT.mem_out;
- 
 //   assign Halt = DUT.memory0.halt; //You won't need this because it's part of the main cpu interface
    // Is processor halted (1 bit signal)
    
+
+   assign Inst = DUT.IF_instruction;
+   //Instruction fetched in the current cycle
+   
+   assign RegWrite = DUT.WB_regwrite;
+   // Is register file being written to in this cycle, one bit signal (1 means yes, 0 means no)
+  
+   assign WriteRegister = DUT.WB_regtowrite;
+   // If above is true, this should hold the name of the register being written to. (4 bit signal)
+   
+   assign WriteData = DUT.WB_output_value;
+   // If above is true, this should hold the Data being written to the register. (16 bits)
+   
+   assign MemRead =  (DUT.MEM_memread);
+   // Is memory being read from, in this cycle. one bit signal (1 means yes, 0 means no)
+   
+   assign MemWrite = (DUT.MEM_memwrite);
+   // Is memory being written to, in this cycle (1 bit signal)
+   
+   assign MemAddress = DUT.MEM_alu_out;
+   // If there's a memory access this cycle, this should hold the address to access memory with (for both reads and writes to memory, 16 bits)
+   
+   assign MemDataIn = DUT.MEM_datain;
+   // If there's a memory write in this cycle, this is the Data being written to memory (16 bits)
+   
+   assign MemDataOut = DUT.MEM_memdata;
+   // If there's a memory read in this cycle, this is the data being read out of memory (16 bits)
+
+
+
    /* Add anything else you want here */
-	
 
    
 endmodule
